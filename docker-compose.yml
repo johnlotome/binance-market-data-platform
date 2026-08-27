@@ -57,5 +57,24 @@ services:
       # Enables JMX metrics scraping for Prometheus (image ships a jmx exporter agent).
       JMXPORT: 9404
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: clickhouse
+    depends_on:
+      - kafka
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+      - "9363:9363" # native Prometheus metrics endpoint
+    volumes:
+      - ./clickhouse/init:/docker-entrypoint-initdb.d
+      - ch_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   pg_data:
+  ch_data:
