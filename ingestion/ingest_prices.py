@@ -59,7 +59,7 @@ ON CONFLICT (symbol) DO UPDATE SET
 
 def fetch_prices() -> list[dict]:
     """Fetch 24hr ticker data for defined symbols from Binance API."""
-    params = {"symbols": json.dumps(SYMBOLS)}
+    params = {"symbols": json.dumps(SYMBOLS, separators=(",", ":"))}
     resp = requests.get(BINANCE_URL, params=params, timeout=15)
     resp.raise_for_status()
     return resp.json()
