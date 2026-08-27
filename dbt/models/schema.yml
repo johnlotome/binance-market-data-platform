@@ -1,0 +1,34 @@
+version: 2
+
+sources:
+  - name: raw
+    database: raw
+    tables:
+      - name: crypto_prices
+        description: "CDC-landed rows from Postgres via Debezium + Kafka, deduplicated by ReplacingMergeTree."
+
+models:
+  - name: stg_crypto_prices
+    columns:
+      - name: coin_id
+        tests: [not_null, unique]
+      - name: current_price
+        tests: [not_null]
+      - name: symbol
+        tests: [not_null, unique] # symbol and coin_id should be 1:1
+      - name: last_updated
+        tests: [not_null] # a row with no timestamp is a broken row
+
+  - name: mart_crypto_market_snapshot
+    columns:
+      - name: coin_id
+        tests: [not_null, unique]
+      - name: symbol
+        tests: [not_null, unique]
+      - name: trend_24h
+        tests:
+          - accepted_values:
+              arguments:
+                values: ["up", "down", "flat"]
+      - name: current_price
+        tests: [not_null]

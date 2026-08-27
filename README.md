@@ -55,6 +55,7 @@ docker compose up -d clickhouse
 docker logs clickhouse --tail 100
 
 docker exec -it clickhouse clickhouse-client
+docker exec -it clickhouse clickhouse-client --user default --password ""
 
 SHOW DATABASES;
 
@@ -78,5 +79,18 @@ docker exec -it clickhouse tail -100 /var/log/clickhouse-server/clickhouse-serve
 
 docker exec -it clickhouse tail -f /var/log/clickhouse-server/clickhouse-server.log | grep -i "crypto_prices"
 
+
+
+cd dbt
+dbt run --profiles-dir .
+
+CLICKHOUSE_HOST=localhost dbt run --profiles-dir .
+
+
+SELECT * FROM staging_marts.mart_crypto_market_snapshot;
+
+
+
+CLICKHOUSE_HOST=localhost CLICKHOUSE_PASSWORD=pass dbt test --profiles-dir .
 
 
