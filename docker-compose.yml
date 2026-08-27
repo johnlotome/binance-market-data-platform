@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: debezium/postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - ./postgres/init:/docker-entrypoint-initdb.d
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d sourcedb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

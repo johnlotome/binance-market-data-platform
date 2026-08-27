@@ -7,6 +7,10 @@ meaningful rather than trivial.
 
 """
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import json
 import logging
 import os
@@ -20,17 +24,11 @@ logger = logging.getLogger(__name__)
 
 BINANCE_URL = "https://api.binance.com/api/v3/ticker/24hr"
 
-# Targets key USDT trading pairs
-SYMBOLS = [
-    "BTCUSDT",
-    "ETHUSDT",
-    "BNBUSDT",
-    "SOLUSDT",
-    "XRPUSDT",
-    "ADAUSDT",
-    "DOGEUSDT",
-    "TRXUSDT",
-]
+# Symbols
+SYMBOLS = os.environ.get(
+    "SYMBOLS",
+    "BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,ADAUSDT,DOGEUSDT,TRXUSDT",
+).split(",")
 
 PG_DSN = os.environ.get(
     "PG_DSN",
