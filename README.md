@@ -94,3 +94,34 @@ SELECT * FROM staging_marts.mart_crypto_market_snapshot;
 CLICKHOUSE_HOST=localhost CLICKHOUSE_PASSWORD=pass dbt test --profiles-dir .
 
 
+
+docker compose build airflow airflow-init
+
+docker compose up -d
+docker compose ps
+
+
+
+docker compose logs airflow | grep -i "crypto_prices_pipeline\|broken\|error" | tail -30
+
+
+
+
+docker ps | grep postgres
+sudo lsof -i :5432
+
+
+
+docker compose logs airflow-init
+
+
+docker compose exec airflow airflow dags list-import-errors
+
+
+docker compose exec airflow airflow dags reserialize
+
+
+docker compose exec airflow cat /opt/airflow/simple_auth_manager_passwords.json.generated
+
+
+docker compose exec airflow airflow dags trigger crypto_prices_pipeline

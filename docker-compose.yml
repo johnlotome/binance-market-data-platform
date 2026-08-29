@@ -80,7 +80,9 @@ services:
 
 
   airflow-init:
-    image: apache/airflow:2.9.3-python3.11
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow-init
     depends_on:
       - postgres
@@ -94,7 +96,9 @@ services:
       - ./:/opt/airflow/project
 
   airflow:
-    image: apache/airflow:2.9.3-python3.11
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: airflow
     depends_on:
       - airflow-init
@@ -110,15 +114,11 @@ services:
       CLICKHOUSE_PORT: 8123
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
-      PG_DSN: "host=postgres port=5432 dbname=sourcedb user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
-      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary requests dbt-clickhouse==1.7.0"
+      PG_DSN: "host=postgres port=5432 dbname=${POSTGRES_DB} user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./:/opt/airflow/project
-    command: >
-      bash -c "airflow users create --username admin --password admin
-      --firstname a --lastname a --role Admin --email admin@example.com || true
-      && (airflow scheduler &) && airflow webserver"
+    command: airflow standalone
 
 volumes:
   pg_data:
