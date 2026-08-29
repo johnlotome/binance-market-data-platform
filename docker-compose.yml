@@ -57,6 +57,15 @@ services:
       # Enables JMX metrics scraping for Prometheus (image ships a jmx exporter agent).
       JMXPORT: 9404
 
+  connect-init:
+    image: curlimages/curl:8.8.0
+    container_name: connect-init
+    depends_on:
+      - kafka-connect
+    volumes:
+      - ./debezium:/config
+    entrypoint: ["/bin/sh", "/config/register-connector.sh"]
+
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     container_name: clickhouse

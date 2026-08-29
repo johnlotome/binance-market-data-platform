@@ -38,6 +38,8 @@ curl -X PUT http://localhost:8083/connectors \
   -H "Content-Type: application/json" \
   -d @debezium/pg-connector.json
 
+curl http://localhost:8083/connectors
+
 
   docker exec -it postgres psql -U app -d sourcedb -c "DELETE FROM crypto_prices WHERE symbol = 'TRXUSDT';"
 
