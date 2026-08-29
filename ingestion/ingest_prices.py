@@ -7,10 +7,6 @@ meaningful rather than trivial.
 
 """
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 import json
 import logging
 import os
@@ -18,6 +14,9 @@ from datetime import datetime, timezone
 
 import psycopg2
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
