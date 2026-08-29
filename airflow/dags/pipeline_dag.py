@@ -23,7 +23,7 @@ default_args = {
 
 with DAG(
     dag_id="crypto_prices_pipeline",
-    description="REST ingestion -> Postgres -> (Debezium CDC, out-of-band) -> ClickHouse -> dbt",
+    description="REST ingestion -> Postgres -> (Debezium CDC) -> ClickHouse -> dbt",
     schedule="*/5 * * * *",
     start_date=datetime(2026, 1, 1),
     catchup=False,

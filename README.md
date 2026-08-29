@@ -127,3 +127,9 @@ docker compose exec airflow cat /opt/airflow/simple_auth_manager_passwords.json.
 
 
 docker compose exec airflow airflow dags trigger crypto_prices_pipeline
+
+
+
+
+mkdir -p .github/workflows
+nano .github/workflows/ci.yml

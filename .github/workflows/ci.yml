@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  lint-and-unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Unit tests
+        run: pytest tests/ -v
+
+  integration-test:
+    runs-on: ubuntu-latest
+    needs: lint-and-unit-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for CI
+        run: |
+          cat > .env << 'EOF'
+          POSTGRES_DB=sourcedb
+          POSTGRES_USER=app
+          POSTGRES_PASSWORD=app
+          POSTGRES_PORT=5432
+          CLICKHOUSE_USER=default
+          CLICKHOUSE_PASSWORD=pass
+          CLICKHOUSE_HOST=clickhouse
+          CLICKHOUSE_PORT=8123
+          SYMBOLS=BTCUSDT,ETHUSDT,BNBUSDT,SOLUSDT,XRPUSDT,ADAUSDT,DOGEUSDT,TRXUSDT
+          EOF
+
+      - name: Build images
+        run: docker compose build
+
+      - name: Bring up the full stack
+        run: docker compose up -d
+
+      - name: Wait for Postgres, ClickHouse, Kafka Connect to be healthy
+        run: |
+          timeout 180 bash -c '
+            until curl -sf http://localhost:8123/ping \
+              && curl -sf http://localhost:8083/connectors \
+              && docker compose exec -T postgres pg_isready -U app -d sourcedb; do
+              echo "waiting for core services..."; sleep 5
+            done'
+
+      - name: Confirm Debezium connector auto-registered
+        run: |
+          timeout 60 bash -c '
+            until curl -s http://localhost:8083/connectors | grep -q "pg-crypto-prices-connector"; do
+              echo "waiting for connector registration..."; sleep 3
+            done'
+
+      - name: Wait for Airflow to be ready
+        run: |
+          timeout 180 bash -c '
+            until curl -sf http://localhost:8080/api/v2/monitor/health > /dev/null; do
+              echo "waiting for airflow..."; sleep 5
+            done'
+
+      - name: Trigger one ingestion cycle
+        run: docker compose exec -T airflow python /opt/airflow/project/ingestion/ingest_prices.py
+
+      - name: Give CDC time to propagate Postgres -> Kafka -> ClickHouse
+        run: sleep 30
+
+      - name: Verify rows landed in ClickHouse raw layer
+        run: |
+          COUNT=$(curl -s "http://localhost:8123/?query=SELECT+count()+FROM+raw.crypto_prices" --user "default:pass")
+          echo "Row count: $COUNT"
+          [ "$COUNT" -gt 0 ]
+
+      - name: Run dbt build against the live stack
+        run: |
+          docker compose exec -T airflow bash -c \
+            "cd /opt/airflow/project/dbt && /home/airflow/dbt-venv/bin/dbt build --profiles-dir . --target-path /tmp/dbt-target --log-path /tmp/dbt-logs"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
