@@ -73,8 +73,29 @@ jobs:
               echo "waiting for airflow..."; sleep 5
             done'
 
-      - name: Trigger one ingestion cycle
-        run: docker compose exec -T airflow python /opt/airflow/project/ingestion/ingest_prices.py
+      # - name: Trigger one ingestion cycle
+      #   run: docker compose exec -T airflow python /opt/airflow/project/ingestion/ingest_prices.py
+
+      - name: Seed all 8 symbols directly into Postgres (bypasses Binance — geo-blocked from CI runners)
+        run: |
+          docker compose exec -T postgres psql -U app -d sourcedb -c "
+            INSERT INTO crypto_prices (
+              symbol, coin_id, name, current_price, price_change_24h,
+              price_change_percent_24h, total_volume, quote_volume,
+              high_price_24h, low_price_24h, trade_count, last_updated, ingested_at
+            ) VALUES
+              ('BTCUSDT', 'btc', 'BTC', 79596.0, 824.0, 1.046, 15065.57131, 1187148900.97, 80520.0, 77632.58, 4383542, now(), now()),
+              ('ETHUSDT', 'eth', 'ETH', 2504.74, 34.74, 1.406, 321846.862, 802012090.07, 2566.53, 2432.32, 3346775, now(), now()),
+              ('BNBUSDT', 'bnb', 'BNB', 706.46, -0.34, -0.048, 142995.848, 100615612.89, 715.79, 692.1, 822502, now(), now()),
+              ('SOLUSDT', 'sol', 'SOL', 104.97, 8.58, 8.901, 3699236.998, 369534072.18, 105.06, 94.95, 1658707, now(), now()),
+              ('XRPUSDT', 'xrp', 'XRP', 1.4276, 0.058, 4.19, 163101149.9, 233074587.9, 1.4431, 1.3574, 1498122, now(), now()),
+              ('ADAUSDT', 'ada', 'ADA', 0.2129, 0.0075, 3.651, 128285684.1, 27245842.9959, 0.2133, 0.2129, 185825, now(), now()),
+              ('DOGEUSDT', 'doge', 'DOGE', 0.08924, 0.00315, 3.659, 688361965.0, 66058013.38699, 0.08986, 0.08385, 725048, now(), now()),
+              ('TRXUSDT', 'trx', 'TRX', 0.3371, 0.0021, 0.627, 114393371.2, 38480086.17044, 0.3371, 0.3338, 64709, now(), now())
+            ON CONFLICT (symbol) DO UPDATE SET
+              current_price = EXCLUDED.current_price,
+              ingested_at = EXCLUDED.ingested_at;
+          "
 
       - name: Give CDC time to propagate Postgres -> Kafka -> ClickHouse
         run: sleep 30
