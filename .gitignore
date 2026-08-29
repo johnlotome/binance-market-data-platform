@@ -7,5 +7,6 @@ logs/
 dbt/logs/
 dbt/dbt_packages/
 dbt/target/
+dbt/.user.yml
 
 .venv/

@@ -14,7 +14,7 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U app -d sourcedb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -77,6 +77,48 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+
+  airflow-init:
+    image: apache/airflow:2.9.3-python3.11
+    container_name: airflow-init
+    depends_on:
+      - postgres
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    entrypoint: ["airflow", "db", "migrate"]
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+
+  airflow:
+    image: apache/airflow:2.9.3-python3.11
+    container_name: airflow
+    depends_on:
+      - airflow-init
+      - postgres
+      - clickhouse
+    ports:
+      - "8080:8080"
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 8123
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      PG_DSN: "host=postgres port=5432 dbname=sourcedb user=${POSTGRES_USER} password=${POSTGRES_PASSWORD}"
+      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary requests dbt-clickhouse==1.7.0"
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./:/opt/airflow/project
+    command: >
+      bash -c "airflow users create --username admin --password admin
+      --firstname a --lastname a --role Admin --email admin@example.com || true
+      && (airflow scheduler &) && airflow webserver"
 
 volumes:
   pg_data:
