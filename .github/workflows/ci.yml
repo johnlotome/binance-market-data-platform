@@ -22,7 +22,7 @@ jobs:
         run: ruff check .
 
       - name: Unit tests
-        run: pytest tests/ -v
+        run: python -m pytest tests/ -v
 
   integration-test:
     runs-on: ubuntu-latest
