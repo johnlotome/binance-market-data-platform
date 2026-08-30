@@ -19,6 +19,17 @@ services:
       timeout: 5s
       retries: 10
 
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable"
+    ports:
+      - "9187:9187"
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
     container_name: zookeeper
@@ -40,22 +51,22 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   kafka-connect:
-    image: debezium/connect:2.6
+    build:
+      context: ./kafka-connect
+      dockerfile: Dockerfile
     container_name: kafka-connect
     depends_on:
       - kafka
       - postgres
     ports:
       - "8083:8083"
-      - "9404:9404" # jmx-exporter metrics for Prometheus
+      - "9404:9404"
     environment:
       BOOTSTRAP_SERVERS: kafka:9092
       GROUP_ID: connect-cluster
       CONFIG_STORAGE_TOPIC: connect_configs
       OFFSET_STORAGE_TOPIC: connect_offsets
       STATUS_STORAGE_TOPIC: connect_statuses
-      # Enables JMX metrics scraping for Prometheus (image ships a jmx exporter agent).
-      JMXPORT: 9404
 
   connect-init:
     image: curlimages/curl:8.8.0
@@ -74,12 +85,13 @@ services:
     ports:
       - "8123:8123"
       - "9000:9000"
-      - "9363:9363" # native Prometheus metrics endpoint
+      - "9363:9363"
     environment:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
     volumes:
       - ./clickhouse/init:/docker-entrypoint-initdb.d
+      - ./clickhouse/config/prometheus.xml:/etc/clickhouse-server/config.d/prometheus.xml
       - ch_data:/var/lib/clickhouse
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "localhost:8123/ping"]
@@ -87,6 +99,12 @@ services:
       timeout: 5s
       retries: 10
 
+  statsd-exporter:
+    image: prom/statsd-exporter:v0.26.0
+    container_name: statsd-exporter
+    ports:
+      - "9102:9102"
+      - "8125:8125/udp"
 
   airflow-init:
     build:
@@ -113,12 +131,17 @@ services:
       - airflow-init
       - postgres
       - clickhouse
+      - statsd-exporter
     ports:
       - "8080:8080"
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__METRICS__STATSD_ON: "True"
+      AIRFLOW__METRICS__STATSD_HOST: "statsd-exporter"
+      AIRFLOW__METRICS__STATSD_PORT: "8125"
+      AIRFLOW__METRICS__STATSD_PREFIX: "airflow"
       CLICKHOUSE_HOST: clickhouse
       CLICKHOUSE_PORT: 8123
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
@@ -129,6 +152,28 @@ services:
       - ./:/opt/airflow/project
     command: airflow standalone
 
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+
 volumes:
   pg_data:
   ch_data:
+  prometheus_data:
+  grafana_data:
